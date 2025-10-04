@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>ProGPT</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="sidebar">
+    <h2>ProGPT 💬</h2>
+    <form action="/new-chat" method="POST">
+      <input type="text" name="title" placeholder="Yeni sohbet ismi...">
+      <button type="submit">➕ Yeni Sohbet</button>
+    </form>
+
+    <h3>Geçmiş Sohbetler</h3>
+    <ul>
+      <% chats.forEach(chat => { %>
+        <li class="<%= chat.id === activeChat.id ? 'active' : '' %>">
+          <a href="/chat/<%= chat.id %>"><%= chat.title %></a>
+        </li>
+      <% }) %>
+    </ul>
+  </div>
+
+  <div class="chat">
+    <div id="messages" class="messages">
+      <% activeChat.messages.forEach(msg => { %>
+        <div class="msg <%= msg.role %>">
+          <% if (msg.role === "user") { %>👤 <%= msg.content %>
+          <% } else { %>🤖 <%= msg.content %><% } %>
+        </div>
+      <% }) %>
+    </div>
+
+    <div class="input-area">
+      <input id="input" placeholder="Mesaj yaz..." autocomplete="off">
+      <button onclick="sendMessage()">Gönder</button>
+      <button onclick="generateImage()">🖼️ Resim</button>
+      <input type="file" id="fileInput" onchange="uploadImage()">
+    </div>
+  </div>
+
+  <script>
+    const messagesDiv = document.getElementById("messages");
+    const input = document.getElementById("input");
+
+    function addMessage(role, text, img) {
+      const div = document.createElement("div");
+      div.className = "msg " + role;
+      if (text) div.innerText = text;
+      if (img) {
+        const image = document.createElement("img");
+        image.src = img;
+        div.appendChild(image);
+      }
+      messagesDiv.appendChild(div);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const msg = input.value.trim();
+      if (!msg) return;
+      input.value = "";
+      addMessage("user", msg);
+
+      const res = await fetch("/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: msg })
+      });
+      const data = await res.json();
+      addMessage("assistant", data.reply);
+    }
+
+    async function generateImage() {
+      const msg = input.value.trim();
+      if (!msg) return;
+      input.value = "";
+      addMessage("user", msg);
+
+      const res = await fetch("/image/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: msg })
+      });
+      const data = await res.json();
+      if (data.url) addMessage("assistant", "", data.url);
+      else addMessage("assistant", "❌ Görsel oluşturulamadı.");
+    }
+
+    async function uploadImage() {
+      const file = document.getElementById("fileInput").files[0];
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/image/upload", { method: "POST", body: form });
+      const data = await res.json();
+      addMessage("user", "", URL.createObjectURL(file));
+    }
+  </script>
+</body>
+</html>
